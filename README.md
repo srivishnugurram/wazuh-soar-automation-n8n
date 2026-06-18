@@ -1,0 +1,1 @@
+# wazuh-soar-automation-n8n
