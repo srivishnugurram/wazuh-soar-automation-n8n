@@ -1,0 +1,140 @@
+---
+
+## Setup Guide
+
+### 1. Install n8n via Docker (WSL)
+
+```bash
+mkdir ~/n8n && cd ~/n8n
+nano docker-compose.yml
+docker compose up -d
+docker ps
+```
+
+Access n8n at `http://localhost:5678`
+
+---
+
+### 2. Configure FIM on Wazuh Agent
+
+Edit `/var/ossec/etc/ossec.conf` on the agent:
+
+```xml
+<directories check_all="yes" report_changes="yes" realtime="yes">/root</directories>
+```
+
+```bash
+sudo systemctl restart wazuh-agent
+```
+
+Test: `touch /root/testfile.txt` — verify alert in Wazuh dashboard.
+
+---
+
+### 3. Deploy Integration Script on Manager
+
+```bash
+sudo cp custom-n8n /var/ossec/integrations/custom-n8n
+sudo chmod 750 /var/ossec/integrations/custom-n8n
+sudo chown root:wazuh /var/ossec/integrations/custom-n8n
+```
+
+---
+
+### 4. Add Integration Block on Manager
+
+Edit `/var/ossec/etc/ossec.conf` — add before first `</ossec_config>`:
+
+```xml
+<integration>
+  <name>custom-n8n</name>
+  <hook_url>http://WSL_IP:5678/webhook/wazuh-fim</hook_url>
+  <rule_id>100201</rule_id>
+  <alert_format>json</alert_format>
+</integration>
+```
+
+> Replace `WSL_IP` with your actual WSL IP (`hostname -I` inside WSL). This IP can change on reboot.
+
+```bash
+sudo systemctl restart wazuh-manager
+```
+
+---
+
+### 5. n8n Workflow Nodes
+
+| # | Node | Config |
+|---|------|--------|
+| 1 | Webhook | Method: POST, Path: wazuh-fim, Respond: When Last Node Finishes |
+| 2 | Edit Fields | Maps FIM fields from alert JSON (see table below) |
+| 3 | HTTP Request | GET VirusTotal — `https://www.virustotal.com/api/v3/files/{{$json.sha256}}` |
+| 4 | HTTP Request | POST ntfy — `https://ntfy.sh/your-topic` |
+
+**Edit Fields mappings:**
+
+| Field | Expression |
+|-------|-----------|
+| hostname | `{{$json.body.agent.name}}` |
+| agent_ip | `{{$json.body.agent.ip}}` |
+| filename | `{{$json.body.syscheck.path}}` |
+| username | `{{$json.body.syscheck.uname_after}}` |
+| md5 | `{{$json.body.syscheck.md5_after}}` |
+| sha256 | `{{$json.body.syscheck.sha256_after}}` |
+| event_type | `{{$json.body.syscheck.event}}` |
+
+Publish the workflow (toggle Active) before testing.
+
+---
+
+### 6. End-to-End Test
+
+```bash
+# On Wazuh agent as root:
+touch /root/testfile.txt
+```
+
+Expected:
+1. FIM alert in Wazuh dashboard (rule 100201)
+2. n8n Executions tab shows new green execution
+3. ntfy push notification on phone
+
+---
+
+### 7. Manual Webhook Test
+
+```bash
+curl -X POST http://WSL_IP:5678/webhook/wazuh-fim \
+  -H "Content-Type: application/json" \
+  -d '{"agent":{"name":"test-host","ip":"1.2.3.4"},"syscheck":{"path":"/root/test.txt","uname_after":"root","md5_after":"44d88612fea8a8f36de82e1278abb02","sha256_after":"275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f","event":"added"}}'
+```
+
+---
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| Alert in Wazuh, nothing in n8n | Check `/var/ossec/logs/integrations.log` |
+| Script not triggering | `chmod 750` + `chown root:wazuh` on `custom-n8n` |
+| VirusTotal 404 | File not in VT database — expected for unknown files |
+| ntfy not arriving | Topic name must match exactly in n8n and ntfy app |
+| WSL IP changed | Run `hostname -I`, update `ossec.conf`, restart manager |
+
+---
+
+## Skills Demonstrated
+
+- SIEM alert triage and custom rule authoring (Wazuh)
+- SOAR workflow design and automation (n8n)
+- Threat intelligence enrichment via API (VirusTotal)
+- File Integrity Monitoring (FIM) — MITRE ATT&CK T1565, T1083
+- Shell scripting for security automation
+- Docker + WSL2 deployment
+- REST API integration
+
+---
+
+## Author
+
+**Sri Vishnu Gurram**
