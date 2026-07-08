@@ -1,0 +1,16 @@
+<!-- Add to /var/ossec/etc/rules/local_rules.xml on Wazuh manager -->
+
+<group name="syscheck,fim_custom,">
+
+  <rule id="100201" level="12">
+    <if_group>syscheck</if_group>
+    <field name="syscheck.path">/root</field>
+    <description>FIM alert: File changed in /root - $(syscheck.event) on $(syscheck.path)</description>
+    <mitre>
+      <id>T1565</id>
+      <id>T1083</id>
+    </mitre>
+    <group>pci_dss_11.5,gdpr_II_5.1.f,</group>
+  </rule>
+
+</group>
