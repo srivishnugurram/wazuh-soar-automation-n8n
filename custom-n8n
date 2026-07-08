@@ -1,0 +1,35 @@
+#!/bin/bash
+# Wazuh Custom Integration Script
+# Forwards Wazuh alerts to n8n webhook
+# Deploy to: /var/ossec/integrations/custom-n8n
+# Permissions: chmod 750, chown root:wazuh
+
+LOG_FILE="/var/ossec/logs/integrations.log"
+
+ALERT_FILE="$1"
+HOOK_URL="$3"
+
+echo "$(date) - custom-n8n triggered, sending alert to ${HOOK_URL}" >> "${LOG_FILE}"
+
+ALERT_JSON=$(cat "${ALERT_FILE}" 2>>"${LOG_FILE}")
+
+if [ -z "${ALERT_JSON}" ]; then
+  echo "$(date) - custom-n8n ERROR: Empty alert file" >> "${LOG_FILE}"
+  exit 1
+fi
+
+if [ -z "${HOOK_URL}" ]; then
+  echo "$(date) - custom-n8n ERROR: No hook_url provided" >> "${LOG_FILE}"
+  exit 1
+fi
+
+RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+  -m 10 \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d "${ALERT_JSON}" \
+  "${HOOK_URL}" 2>>"${LOG_FILE}")
+
+echo "$(date) - custom-n8n response code: ${RESPONSE}" >> "${LOG_FILE}"
+
+exit 0
