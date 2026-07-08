@@ -1,0 +1,9 @@
+*.env
+.env*
+secrets/
+*apikey*
+*api_key*
+*.log
+.DS_Store
+Thumbs.db
+configs/n8n/workflow-with-creds.json
