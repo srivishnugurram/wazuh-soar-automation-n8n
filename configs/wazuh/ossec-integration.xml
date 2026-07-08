@@ -1,0 +1,9 @@
+<!-- Add inside first <ossec_config> block in /var/ossec/etc/ossec.conf on manager -->
+<!-- Replace WSL_IP with your actual WSL IP (hostname -I inside WSL) -->
+
+<integration>
+  <name>custom-n8n</name>
+  <hook_url>http://WSL_IP:5678/webhook/wazuh-fim</hook_url>
+  <rule_id>100201</rule_id>
+  <alert_format>json</alert_format>
+</integration>
